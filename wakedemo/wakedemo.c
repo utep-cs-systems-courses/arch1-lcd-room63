@@ -2,20 +2,20 @@
 #include <libTimer.h>
 #include "lcdutils.h"
 #include "lcddraw.h"
+#include "buzzer.h"
+//#include "sound.h"
 
-// WARNING: LCD DISPLAY USES P1.0.  Do not touch!!! 
-
-#define LED BIT6		/* note that bit zero req'd for display */
+#define LED BIT6	       
 
 #define SW1 1
 #define SW2 2
 #define SW3 4
 #define SW4 8
-
 #define SWITCHES 15
 
-static char 
-switch_update_interrupt_sense()
+
+
+static char switch_update_interrupt_sense()
 {
   char p2val = P2IN;
   /* update switch interrupt to detect changes from current buttons */
@@ -24,8 +24,7 @@ switch_update_interrupt_sense()
   return p2val;
 }
 
-void 
-switch_init()			/* setup switch */
+void switch_init()			/* setup switch */
 {  
   P2REN |= SWITCHES;		/* enables resistors for switches */
   P2IE |= SWITCHES;		/* enable interrupts from switches */
@@ -36,20 +35,13 @@ switch_init()			/* setup switch */
 
 int switches = 0;
 
-void
-switch_interrupt_handler()
+void switch_interrupt_handler()
 {
   char p2val = switch_update_interrupt_sense();
   switches = ~p2val & SWITCHES;
 }
 
-
-// axis zero for col, axis 1 for row
-short drawPos[2] = {10,10}, controlPos[2] = {10,10};
-short velocity[2] = {3,8}, limits[2] = {screenWidth-36, screenHeight-8};
-
 short redrawScreen = 1;
-u_int controlFontColor = COLOR_GREEN;
 
 void wdt_c_handler()
 {
@@ -67,58 +59,104 @@ void update_shape();
 void main()
 {
   
-  P1DIR |= LED;		/**< Green led on when CPU on */
+  P1DIR |= LED;		/* Green led on when CPU on */
   P1OUT |= LED;
   configureClocks();
   lcd_init();
   switch_init();
-  
-  enableWDTInterrupts();      /**< enable periodic interrupt */
-  or_sr(0x8);	              /**< GIE (enable interrupts) */
-  
-  clearScreen(COLOR_BLUE);
-  while (1) {			/* forever */
+  buzzer_init();
+ 
+  enableWDTInterrupts();      /* enable periodic interrupt */
+  or_sr(0x8);	              /* GIE (enable interrupts) */
+  u_char width = screenWidth, height = screenHeight;
+  clearScreen(COLOR_BLACK);
+  while (1) {
     if (redrawScreen) {
+      
+      drawString5x7(14,5, "First 5x7", COLOR_GREEN, COLOR_BLACK);
+      
+      drawString5x7(8, 120, "Second 5x7", COLOR_GREEN, COLOR_BLACK);
+      
+      
       redrawScreen = 0;
       update_shape();
     }
     P1OUT &= ~LED;	/* led off */
-    or_sr(0x10);	/**< CPU OFF */
+    or_sr(0x10);	/* CPU OFF */
     P1OUT |= LED;	/* led on */
   }
 }
 
-    
-    
-void
-update_shape()
+// Color of the shape.
+unsigned int SHAPE_COLOR = COLOR_DARK_VIOLE;
+
+void update_shape()
 {
   static unsigned char row = screenHeight / 2, col = screenWidth / 2;
-  static char blue = 31, green = 0, red = 31;
+  static int colStep = 5;
+  static int rowStep = 5;
   static unsigned char step = 0;
-  if (switches & SW4) return;
-  if (step <= 60) {
-    int startCol = col - step;
-    int endCol = col + step;
-    int width = 1 + endCol - startCol;
-    // a color in this BGR encoding is BBBB BGGG GGGR RRRR
-    unsigned int color = (blue << 11) | (green << 5) | red;
-    fillRectangle(startCol, row+step, width, 1, color);
-    fillRectangle(startCol, row-step, width, 1, color);
-    if (switches & SW3) green = (green + 1) % 64;
-    if (switches & SW2) blue = (blue + 2) % 32;
-    if (switches & SW1) red = (red - 3) % 32;
+  
+  if (step <= 10) {
+    int startCol = col - step*2;
+    int endCol = col*2 + step*2;
+    int width = 4 + endCol - startCol;
+
+    // Shape drawing.
+    // Shape_color means that it would be violet if not button is pressed
+    // if pressed any of the button it would change to the respective colors
+    // of the buttons.
+    fillRectangle(endCol, row+1-step, width, 1, SHAPE_COLOR);
+    fillRectangle(endCol, row+1+step, width, 1, SHAPE_COLOR);
+    drawPixel(endCol+3, row, SHAPE_COLOR); 
+    drawPixel(endCol+3, row-1, SHAPE_COLOR);
+    drawPixel(endCol+3, row+1, SHAPE_COLOR);
+    drawPixel(endCol+3, row-2, SHAPE_COLOR);
+    drawPixel(endCol+3, row+2, SHAPE_COLOR);
+    drawPixel(endCol+3, row-3, SHAPE_COLOR);
+    drawPixel(endCol+3, row+3, SHAPE_COLOR);
+
+    // draw triangles on horizontal way 
+    fillRectangle(endCol+30, row*step, width, 1, COLOR_BLACK);
+   
+    /* Make shadow of hot pink color to the violet shape   (violet is the original color of the shape) */
+    
+    if (switches & SW1) { // first button
+      SHAPE_COLOR = COLOR_HOT_PINK;
+      buzzer_set_period(0);
+    }
+        /* Make shadow of gold color to the violet shape   (violet is the original color of the shape) */
+    // second button.
+    if (switches & SW2) {
+      SHAPE_COLOR = COLOR_GOLD;
+      buzzer_set_period(0);
+    }
+        /* Make shadow of aquamarine color to the violet shape   (violet is the original color of the shape) */
+    // third button.
+    if (switches & SW3) {
+      SHAPE_COLOR = COLOR_AQUAMARINE;
+      buzzer_set_period(0);
+    }
+        /* Make shadow of black color to the violet shape   (violet is the original color of the shape) */
+    // four button.
+    if (switches & SW4) {
+      SHAPE_COLOR = COLOR_BLACK;
+      buzzer_set_period(0);
+    }
     step ++;
+    
   } else {
-     clearScreen(COLOR_BLUE);
+
+    // move the shape to the left
+    col -= colStep;
+    
+     clearScreen(COLOR_GOLDENROD);
      step = 0;
   }
 }
 
-
 /* Switch on S2 */
-void
-__interrupt_vec(PORT2_VECTOR) Port_2(){
+void __interrupt_vec(PORT2_VECTOR) Port_2(){
   if (P2IFG & SWITCHES) {	      /* did a button cause this interrupt? */
     P2IFG &= ~SWITCHES;		      /* clear pending sw interrupts */
     switch_interrupt_handler();	/* single handler for all switches */
