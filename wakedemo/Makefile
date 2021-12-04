@@ -13,11 +13,15 @@ all:wakedemo.elf
 wakedemo.elf: ${COMMON_OBJECTS} wakedemo.o wdt_handler.o buzzer.o sound.o
 	${CC} ${CFLAGS} ${LDFLAGS} -o $@ $^ -lTimer -lLcd 
 
+wakedemoAssem.elf: ${COMMON_OBJECTS} wakedemo.o wdt_handler.o buzzer.o sounds.o
+	${CC} ${CFLAGS} ${LDFLAGS} -o $@ $^ -lTimer -lLcd 
 
 
 load: wakedemo.elf
 	msp430loader.sh $^
-
+# assembly load.
+load2: wakedemoAssem.elf
+	msp430loader.sh $^
 
 
 clean:
@@ -26,3 +30,5 @@ clean:
 buzzer.o: buzzer.h
 
 sound.o: buzzer.h sound.h
+
+sounds.o: buzzer.h sound.h
