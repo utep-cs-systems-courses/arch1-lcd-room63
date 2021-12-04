@@ -3,7 +3,7 @@
 #include "lcdutils.h"
 #include "lcddraw.h"
 #include "buzzer.h"
-//#include "sound.h"
+#include "sound.h"
 
 #define LED BIT6	       
 
@@ -14,7 +14,8 @@
 #define SWITCHES 15
 
 
-
+int period = 500;
+char songT = 0;
 static char switch_update_interrupt_sense()
 {
   char p2val = P2IN;
@@ -140,8 +141,7 @@ void update_shape()
         /* Make shadow of black color to the violet shape   (violet is the original color of the shape) */
     // four button.
     if (switches & SW4) {
-      SHAPE_COLOR = COLOR_BLACK;
-      buzzer_set_period(0);
+      playSong();
     }
     step ++;
     
